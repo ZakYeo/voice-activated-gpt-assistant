@@ -6,7 +6,8 @@ import time
 
 def test_start_stop():
     mock_audio_stream = Mock()
-    processor = STTProcessor(audio_stream=mock_audio_stream)
+    processor = STTProcessor(
+        audio_stream=mock_audio_stream, transcribe_func=lambda _: _)
 
     processor.start()
     mock_audio_stream.start_stream.assert_called_once()
