@@ -16,38 +16,42 @@ def test_start_stop():
     mock_audio_stream.stop_stream.assert_called_once()
 
 
-def test_transcribe_audio_stream():
+def test_transcribe_until_multiple_empty_chunks():
     mock_audio_stream = Mock()
     mock_audio_stream.read.side_effect = [
-        b"audio_chunk_1", b"audio_chunk_2", None]  # None simulates end of stream
+        b"audio_chunk_1", b"audio_chunk_2", b"", b"", b"", b"", b""
+    ]  # Stops after 5 consecutive empty chunks
 
     transcribe_mock = Mock()
-    transcribe_mock.side_effect = ["Hello", " world", ""]
+    transcribe_mock.side_effect = ["Hello", " world"]
 
     processor = STTProcessor(
         audio_stream=mock_audio_stream, transcribe_func=transcribe_mock)
 
     processor.start()
-    result = processor.transcribe(duration=1)
+    result = processor.transcribe()  # Stops after multiple empty chunks
     processor.stop()
 
     assert transcribe_mock.call_count == 2
     assert result == "Hello world", f"Expected 'Hello world', got '{result}'"
 
 
-def test_transcribe_for_duration():
+def test_transcribe_handles_valid_and_empty_chunks():
     mock_audio_stream = Mock()
-    mock_audio_stream.read.side_effect = [
-        b"audio_chunk_1", b"audio_chunk_2", b"audio_chunk_3"] * 10
+    mock_audio_stream.read.side_effect = (
+        [b"audio_chunk"] * 10 + [b"", b"", b"",
+                                 b"", b""]  # Ends with 5 empty chunks
+    )
 
     transcribe_mock = Mock()
-    transcribe_mock.side_effect = ["Hello", " world", "! "] * 10
+    transcribe_mock.side_effect = ["chunk"] * 10
 
     processor = STTProcessor(
         audio_stream=mock_audio_stream, transcribe_func=transcribe_mock)
 
-    start_time = time.time()
-    processor.transcribe(duration=2)
-    elapsed_time = time.time() - start_time
+    processor.start()
+    result = processor.transcribe()
+    processor.stop()
 
-    assert elapsed_time >= 2, f"Expected at least 2 seconds, got {elapsed_time:.2f} seconds"
+    assert transcribe_mock.call_count == 10
+    assert "chunk" in result
